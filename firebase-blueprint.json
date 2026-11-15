@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user account profile and gamification summary.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "currencyCode": { "type": "string" },
+        "savingsTargetZar": { "type": "number" },
+        "currentStreak": { "type": "integer" },
+        "bestScore": { "type": "integer" },
+        "totalGamePoints": { "type": "integer" },
+        "lastPlayedDate": { "type": "string" },
+        "isPremium": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "ServerTimestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "ServerTimestamp" }
+      },
+      "required": ["userId", "displayName", "currencyCode", "savingsTargetZar", "currentStreak", "bestScore", "totalGamePoints", "createdAt"]
+    },
+    "MoneyTransaction": {
+      "title": "MoneyTransaction",
+      "description": "Income or expense ledger entry in ZAR.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["INCOME", "EXPENSE"] },
+        "category": { "type": "string" },
+        "dateIso": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "amount", "type", "category", "dateIso", "createdAt"]
+    },
+    "BudgetLimit": {
+      "title": "BudgetLimit",
+      "description": "Daily or monthly spending limit per category in ZAR.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "category": { "type": "string" },
+        "limitAmount": { "type": "number" },
+        "period": { "type": "string", "enum": ["DAILY", "MONTHLY"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "category", "limitAmount", "period", "createdAt"]
+    },
+    "PersonalGoal": {
+      "title": "PersonalGoal",
+      "description": "Financial or personal goal with measurable progress.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "targetValue": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "unitLabel": { "type": "string" },
+        "deadlineIso": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "category", "targetValue", "currentValue", "unitLabel", "completed", "createdAt"]
+    },
+    "PlannerTask": {
+      "title": "PlannerTask",
+      "description": "Daily planner task with priority and due date.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "priority": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+        "dueDateIso": { "type": "string" },
+        "dueTime": { "type": "string" },
+        "category": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "priority", "dueDateIso", "category", "completed", "createdAt"]
+    },
+    "SmartReminder": {
+      "title": "SmartReminder",
+      "description": "Bill, appointment, or responsibility reminder with recurrence.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "dueDateTimeIso": { "type": "string" },
+        "recurrence": { "type": "string", "enum": ["ONCE", "DAILY", "WEEKLY", "MONTHLY"] },
+        "amountZar": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "notificationsEnabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "category", "dueDateTimeIso", "recurrence", "completed", "notificationsEnabled", "createdAt"]
+    },
+    "ShoppingItem": {
+      "title": "ShoppingItem",
+      "description": "Shopping list item with estimated ZAR price and shop grouping.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "estimatedPrice": { "type": "number" },
+        "shopName": { "type": "string" },
+        "category": { "type": "string" },
+        "purchased": { "type": "boolean" },
+        "isFrequent": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "quantity", "unit", "estimatedPrice", "shopName", "category", "purchased", "isFrequent", "createdAt"]
+    },
+    "GameScoreRecord": {
+      "title": "GameScoreRecord",
+      "description": "Morning Boost mini-game completion score record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "gameId": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["EASY", "MEDIUM", "HARD"] },
+        "score": { "type": "integer" },
+        "dateIso": { "type": "string" },
+        "durationSeconds": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "gameId", "difficulty", "score", "dateIso", "durationSeconds", "createdAt"]
+    },
+    "SavedQuote": {
+      "title": "SavedQuote",
+      "description": "User-bookmarked daily motivational quote.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "quoteId": { "type": "string" },
+        "text": { "type": "string" },
+        "author": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "quoteId", "text", "author", "category", "createdAt"]
+    },
+    "LocalService": {
+      "title": "LocalService",
+      "description": "Verified or community-submitted South African local service listing.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "businessName": { "type": "string" },
+        "category": { "type": "string" },
+        "city": { "type": "string" },
+        "suburb": { "type": "string" },
+        "businessPhone": { "type": "string" },
+        "servicesOffered": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "isPublished": { "type": "boolean" },
+        "ratingSum": { "type": "integer" },
+        "reviewCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "ownerName", "businessName", "category", "city", "suburb", "businessPhone", "servicesOffered", "isVerified", "isPublished", "ratingSum", "reviewCount", "createdAt"]
+    },
+    "ServiceReview": {
+      "title": "ServiceReview",
+      "description": "Customer review for a local service listing.",
+      "type": "object",
+      "properties": {
+        "serviceId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["serviceId", "authorId", "authorName", "rating", "comment", "createdAt"]
+    },
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Opt-in Morning Boost friend leaderboard entry without PII.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "totalPoints": { "type": "integer" },
+        "currentStreak": { "type": "integer" },
+        "bestScore": { "type": "integer" },
+        "isPublic": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "totalPoints", "currentStreak", "bestScore", "isPublic", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user account profile."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/MoneyTransaction" },
+      "description": "User income and expense transactions."
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/BudgetLimit" },
+      "description": "User daily and monthly category budgets."
+    },
+    "/users/{userId}/financial_goals/{goalId}": {
+      "schema": { "$ref": "#/entities/PersonalGoal" },
+      "description": "User personal and financial goals."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/PlannerTask" },
+      "description": "User daily planner tasks."
+    },
+    "/users/{userId}/reminders/{reminderId}": {
+      "schema": { "$ref": "#/entities/SmartReminder" },
+      "description": "User bill and schedule reminders."
+    },
+    "/users/{userId}/shopping_items/{itemId}": {
+      "schema": { "$ref": "#/entities/ShoppingItem" },
+      "description": "User shopping list items."
+    },
+    "/users/{userId}/game_scores/{scoreId}": {
+      "schema": { "$ref": "#/entities/GameScoreRecord" },
+      "description": "User Morning Boost mini-game score history."
+    },
+    "/users/{userId}/saved_quotes/{quoteId}": {
+      "schema": { "$ref": "#/entities/SavedQuote" },
+      "description": "User saved motivational quotes."
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/LocalService" },
+      "description": "Public directory of local service providers."
+    },
+    "/services/{serviceId}/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/ServiceReview" },
+      "description": "Customer reviews for a local service."
+    },
+    "/leaderboard/{userId}": {
+      "schema": { "$ref": "#/entities/LeaderboardEntry" },
+      "description": "Opt-in Morning Boost friend leaderboard."
+    }
+  }
+}

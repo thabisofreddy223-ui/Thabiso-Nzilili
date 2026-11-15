@@ -1,0 +1,6 @@
+{
+  "name": "LIFEHUB SA",
+  "description": "An everyday South African digital companion for personal finance (ZAR), daily planning, smart reminders, shopping lists, goals, local services, and Morning Boost mini-games.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,436 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // --- Validation Helpers ---
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 160)) &&
+             data.currencyCode is string && data.currencyCode.size() >= 3 && data.currencyCode.size() <= 10 &&
+             data.savingsTargetZar is number && data.savingsTargetZar >= 0 &&
+             data.currentStreak is int && data.currentStreak >= 0 &&
+             data.bestScore is int && data.bestScore >= 0 &&
+             data.totalGamePoints is int && data.totalGamePoints >= 0 &&
+             (!('lastPlayedDate' in data) || (data.lastPlayedDate is string && data.lastPlayedDate.size() <= 20)) &&
+             (!('isPremium' in data) || data.isPremium is bool);
+    }
+
+    function isValidMoneyTransaction(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.amount is number && data.amount > 0 &&
+             data.type in ['INCOME', 'EXPENSE'] &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.dateIso is string && data.dateIso.size() >= 1 && data.dateIso.size() <= 20 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 300));
+    }
+
+    function isValidBudgetLimit(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.limitAmount is number && data.limitAmount > 0 &&
+             data.period in ['DAILY', 'MONTHLY'];
+    }
+
+    function isValidPersonalGoal(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.targetValue is number && data.targetValue > 0 &&
+             data.currentValue is number && data.currentValue >= 0 &&
+             data.unitLabel is string && data.unitLabel.size() >= 1 && data.unitLabel.size() <= 20 &&
+             (!('deadlineIso' in data) || (data.deadlineIso is string && data.deadlineIso.size() <= 20)) &&
+             data.completed is bool;
+    }
+
+    function isValidPlannerTask(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.priority in ['HIGH', 'MEDIUM', 'LOW'] &&
+             data.dueDateIso is string && data.dueDateIso.size() >= 1 && data.dueDateIso.size() <= 20 &&
+             (!('dueTime' in data) || (data.dueTime is string && data.dueTime.size() <= 10)) &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.completed is bool;
+    }
+
+    function isValidSmartReminder(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.dueDateTimeIso is string && data.dueDateTimeIso.size() >= 1 && data.dueDateTimeIso.size() <= 30 &&
+             data.recurrence in ['ONCE', 'DAILY', 'WEEKLY', 'MONTHLY'] &&
+             (!('amountZar' in data) || (data.amountZar is number && data.amountZar >= 0)) &&
+             data.completed is bool &&
+             data.notificationsEnabled is bool;
+    }
+
+    function isValidShoppingItem(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.quantity is number && data.quantity > 0 &&
+             data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 20 &&
+             data.estimatedPrice is number && data.estimatedPrice >= 0 &&
+             data.shopName is string && data.shopName.size() >= 1 && data.shopName.size() <= 60 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.purchased is bool &&
+             data.isFrequent is bool;
+    }
+
+    function isValidGameScoreRecord(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.gameId is string && data.gameId.size() >= 1 && data.gameId.size() <= 40 &&
+             data.difficulty in ['EASY', 'MEDIUM', 'HARD'] &&
+             data.score is int && data.score >= 0 && data.score <= 10000 &&
+             data.dateIso is string && data.dateIso.size() >= 1 && data.dateIso.size() <= 20 &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 3600;
+    }
+
+    function isValidSavedQuote(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.quoteId is string && data.quoteId.size() >= 1 && data.quoteId.size() <= 60 &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 400 &&
+             data.author is string && data.author.size() >= 1 && data.author.size() <= 80 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40;
+    }
+
+    function isValidLocalService(data) {
+      return data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 80 &&
+             data.businessName is string && data.businessName.size() >= 2 && data.businessName.size() <= 100 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 60 &&
+             data.suburb is string && data.suburb.size() <= 60 &&
+             data.businessPhone is string && data.businessPhone.size() >= 5 && data.businessPhone.size() <= 30 &&
+             data.servicesOffered is string && data.servicesOffered.size() >= 3 && data.servicesOffered.size() <= 400 &&
+             data.isVerified is bool &&
+             data.isPublished is bool &&
+             data.ratingSum is int && data.ratingSum >= 0 &&
+             data.reviewCount is int && data.reviewCount >= 0;
+    }
+
+    function isValidServiceReview(data, serviceId) {
+      return data.serviceId is string && data.serviceId == serviceId &&
+             data.authorId is string && data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 500;
+    }
+
+    function isValidLeaderboardEntry(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.totalPoints is int && data.totalPoints >= 0 &&
+             data.currentStreak is int && data.currentStreak >= 0 &&
+             data.bestScore is int && data.bestScore >= 0 &&
+             data.isPublic is bool;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get, list: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'currencyCode', 'savingsTargetZar', 'currentStreak', 'bestScore', 'totalGamePoints', 'createdAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'currencyCode', 'savingsTargetZar', 'currentStreak', 'bestScore', 'totalGamePoints', 'lastPlayedDate', 'isPremium', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                       (!('isPremium' in incoming()) || incoming().isPremium == false) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'currencyCode', 'savingsTargetZar', 'currentStreak', 'bestScore', 'totalGamePoints', 'lastPlayedDate', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      match /transactions/{transactionId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(transactionId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(transactionId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'amount', 'type', 'category', 'dateIso', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'amount', 'type', 'category', 'dateIso', 'notes', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         isValidMoneyTransaction(incoming(), userId);
+        allow update: if isSignedIn() &&
+                         isValidId(transactionId) &&
+                         request.auth.uid == userId &&
+                         isValidMoneyTransaction(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'amount', 'type', 'category', 'dateIso', 'notes', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(transactionId) && request.auth.uid == userId;
+      }
+
+      match /budgets/{budgetId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(budgetId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(budgetId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'category', 'limitAmount', 'period', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'category', 'limitAmount', 'period', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         isValidBudgetLimit(incoming(), userId);
+        allow update: if isSignedIn() &&
+                         isValidId(budgetId) &&
+                         request.auth.uid == userId &&
+                         isValidBudgetLimit(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['category', 'limitAmount', 'period', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(budgetId) && request.auth.uid == userId;
+      }
+
+      match /financial_goals/{goalId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(goalId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(goalId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'category', 'targetValue', 'currentValue', 'unitLabel', 'completed', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'category', 'targetValue', 'currentValue', 'unitLabel', 'deadlineIso', 'completed', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         isValidPersonalGoal(incoming(), userId);
+        allow update: if isSignedIn() &&
+                         isValidId(goalId) &&
+                         request.auth.uid == userId &&
+                         isValidPersonalGoal(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'targetValue', 'currentValue', 'unitLabel', 'deadlineIso', 'completed', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(goalId) && request.auth.uid == userId;
+      }
+
+      match /tasks/{taskId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(taskId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(taskId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'priority', 'dueDateIso', 'category', 'completed', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'priority', 'dueDateIso', 'dueTime', 'category', 'completed', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         isValidPlannerTask(incoming(), userId);
+        allow update: if isSignedIn() &&
+                         isValidId(taskId) &&
+                         request.auth.uid == userId &&
+                         isValidPlannerTask(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'priority', 'dueDateIso', 'dueTime', 'category', 'completed', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(taskId) && request.auth.uid == userId;
+      }
+
+      match /reminders/{reminderId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(reminderId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(reminderId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'category', 'dueDateTimeIso', 'recurrence', 'completed', 'notificationsEnabled', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'category', 'dueDateTimeIso', 'recurrence', 'amountZar', 'completed', 'notificationsEnabled', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         isValidSmartReminder(incoming(), userId);
+        allow update: if isSignedIn() &&
+                         isValidId(reminderId) &&
+                         request.auth.uid == userId &&
+                         isValidSmartReminder(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'dueDateTimeIso', 'recurrence', 'amountZar', 'completed', 'notificationsEnabled', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(reminderId) && request.auth.uid == userId;
+      }
+
+      match /shopping_items/{itemId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(itemId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(itemId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'name', 'quantity', 'unit', 'estimatedPrice', 'shopName', 'category', 'purchased', 'isFrequent', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'quantity', 'unit', 'estimatedPrice', 'shopName', 'category', 'purchased', 'isFrequent', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         isValidShoppingItem(incoming(), userId);
+        allow update: if isSignedIn() &&
+                         isValidId(itemId) &&
+                         request.auth.uid == userId &&
+                         isValidShoppingItem(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'quantity', 'unit', 'estimatedPrice', 'shopName', 'category', 'purchased', 'isFrequent', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(itemId) && request.auth.uid == userId;
+      }
+
+      match /game_scores/{scoreId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(scoreId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(scoreId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'gameId', 'difficulty', 'score', 'dateIso', 'durationSeconds', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'gameId', 'difficulty', 'score', 'dateIso', 'durationSeconds', 'createdAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidGameScoreRecord(incoming(), userId);
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(scoreId) && request.auth.uid == userId;
+      }
+
+      match /saved_quotes/{quoteId} {
+        allow list: if isSignedIn() && request.auth.uid == userId;
+        allow get: if isSignedIn() && isValidId(quoteId) && request.auth.uid == userId;
+        allow create: if isSignedIn() &&
+                         isValidId(quoteId) &&
+                         request.auth.uid == userId &&
+                         incoming().keys().hasAll(['userId', 'quoteId', 'text', 'author', 'category', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'quoteId', 'text', 'author', 'category', 'createdAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidSavedQuote(incoming(), userId);
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(quoteId) && request.auth.uid == userId;
+      }
+    }
+
+    // --- Shared Community Collections ---
+
+    match /services/{serviceId} {
+      allow list: if isSignedIn() && (existing().isPublished == true || existing().ownerId == request.auth.uid);
+      allow get: if isSignedIn() && isValidId(serviceId) && (existing().isPublished == true || existing().ownerId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(serviceId) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().isVerified == false &&
+                       incoming().ratingSum == 0 &&
+                       incoming().reviewCount == 0 &&
+                       incoming().keys().hasAll(['ownerId', 'ownerName', 'businessName', 'category', 'city', 'suburb', 'businessPhone', 'servicesOffered', 'isVerified', 'isPublished', 'ratingSum', 'reviewCount', 'createdAt']) &&
+                       incoming().keys().hasOnly(['ownerId', 'ownerName', 'businessName', 'category', 'city', 'suburb', 'businessPhone', 'servicesOffered', 'isVerified', 'isPublished', 'ratingSum', 'reviewCount', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                       isValidLocalService(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(serviceId) &&
+                       isValidLocalService(incoming()) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().isVerified == existing().isVerified &&
+                       (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                       (
+                         (
+                           existing().ownerId == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['ownerName', 'businessName', 'category', 'city', 'suburb', 'businessPhone', 'servicesOffered', 'isPublished', 'updatedAt'])
+                         ) ||
+                         (
+                           // Atomic rating aggregate increment when submitting a review
+                           incoming().ratingSum >= existing().ratingSum + 1 &&
+                           incoming().ratingSum <= existing().ratingSum + 5 &&
+                           incoming().reviewCount == existing().reviewCount + 1 &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['ratingSum', 'reviewCount', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(serviceId) && existing().ownerId == request.auth.uid;
+
+      match /reviews/{reviewId} {
+        allow list: if isSignedIn() && existing().serviceId == serviceId;
+        allow get: if isSignedIn() && isValidId(reviewId) && existing().serviceId == serviceId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(serviceId) &&
+                         isValidId(reviewId) &&
+                         isValidServiceReview(incoming(), serviceId) &&
+                         incoming().keys().hasAll(['serviceId', 'authorId', 'authorName', 'rating', 'comment', 'createdAt']) &&
+                         incoming().keys().hasOnly(['serviceId', 'authorId', 'authorName', 'rating', 'comment', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         exists(/databases/$(database)/documents/services/$(serviceId));
+
+        allow update: if isSignedIn() &&
+                         isValidId(serviceId) &&
+                         isValidId(reviewId) &&
+                         existing().authorId == request.auth.uid &&
+                         isValidServiceReview(incoming(), serviceId) &&
+                         incoming().authorId == existing().authorId &&
+                         incoming().serviceId == existing().serviceId &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || isValidTimestamp(incoming().updatedAt)) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'authorName', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(serviceId) && isValidId(reviewId) && existing().authorId == request.auth.uid;
+      }
+    }
+
+    match /leaderboard/{userId} {
+      allow list: if isSignedIn() && existing().isPublic == true;
+      allow get: if isSignedIn() && isValidId(userId) && (existing().isPublic == true || request.auth.uid == userId);
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'totalPoints', 'currentStreak', 'bestScore', 'isPublic', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'totalPoints', 'currentStreak', 'bestScore', 'isPublic', 'updatedAt']) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidLeaderboardEntry(incoming(), userId);
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidLeaderboardEntry(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'totalPoints', 'currentStreak', 'bestScore', 'isPublic', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+  }
+}
