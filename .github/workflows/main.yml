@@ -25,8 +25,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Install Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
 
       - name: Install Android SDK packages
         run: |
@@ -49,11 +51,11 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Prepare Gradle
-        run: chmod +x gradlew
+      - name: Check Gradle
+        run: gradle --version
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleDebug
 
       - name: Upload LIFEHUB SA APK
         uses: actions/upload-artifact@v4
